@@ -1,0 +1,3 @@
+Hello-SimpleAI/HC3 for dataset
+Hugging Face AutoTokenizer
+roberta-base-openai-detector
