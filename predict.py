@@ -1,6 +1,14 @@
+import os
 import argparse
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
+try:
+    from peft import AutoPeftModelForSequenceClassification
+    PEFT_AVAILABLE = True
+except ImportError:
+    PEFT_AVAILABLE = False
+
+
 
 def main():
     parser = argparse.ArgumentParser(description="Predict if text is Human or AI generated")
@@ -13,15 +21,28 @@ def main():
                         help="Flag to indicate if this is our custom trained model (flips label mapping)")
     args = parser.parse_args()
 
+    # Automatically treat local paths as custom models
+    if os.path.exists(args.model):
+        args.is_custom = True
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     print(f"Loading model and tokenizer: {args.model}")
     try:
-        tokenizer = AutoTokenizer.from_pretrained(args.model)
-        model = AutoModelForSequenceClassification.from_pretrained(args.model)
+        is_peft = PEFT_AVAILABLE and os.path.exists(os.path.join(args.model, "adapter_config.json"))
+        if is_peft:
+            print("Detected LoRA/PEFT adapter checkpoint.")
+            try:
+                tokenizer = AutoTokenizer.from_pretrained(args.model)
+            except Exception:
+                tokenizer = AutoTokenizer.from_pretrained("roberta-base")
+            model = AutoPeftModelForSequenceClassification.from_pretrained(args.model)
+        else:
+            tokenizer = AutoTokenizer.from_pretrained(args.model)
+            model = AutoModelForSequenceClassification.from_pretrained(args.model)
     except Exception as e:
         print(f"Error loading model: {e}")
-        print("If using a custom model, ensure you've trained it first and are pointing to the correct directory (e.g., ./custom_detector)")
+        print("If using a custom model, ensure you've trained it first and are pointing to the correct directory (e.g., ./quick_train_models/trial_0/checkpoint-38)")
         return
         
     model.to(device)
